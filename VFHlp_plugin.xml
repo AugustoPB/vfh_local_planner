@@ -1,0 +1,7 @@
+<library path="lib/libvfh_local_planner">
+	<class name ="vfh_local_planner/VFHPlannerRos" type ="vfh_local_planner::VFHPlannerRos" base_class_type= "nav_core::BaseLocalPlanner">
+		<description>
+			Simple Plugin for BaseLocalPlanner that allows you to follow the global path as it is.
+		</description>
+	</class>
+</library>
