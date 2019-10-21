@@ -1,6 +1,8 @@
 #ifndef VFH_LOCAL_PLANNER_ROS_H_
 #define VFH_LOCAL_PLANNER_ROS_H_
 
+#include <iostream>
+
 #include <ros/ros.h>
 
 // abstract class from which our plugin inherits
@@ -22,6 +24,7 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 
+#include "vfh_local_planner/vfh_local_planner.h"
 
 
 namespace vfh_local_planner 
@@ -50,11 +53,15 @@ namespace vfh_local_planner
 
         // pointer to external objects (do NOT delete object)
         costmap_2d::Costmap2DROS* costmap_ros_; ///<@brief pointer to costmap
+        costmap_2d::Costmap2D* costmap_;
         tf::TransformListener* tf_; ///<@brief pointer to Transform Listener
+
+        VFHPlanner tes;
         
 
         // flags
         bool initialized_;
+        bool goal_reached_;
     };
 
 }

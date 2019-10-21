@@ -23,7 +23,19 @@ namespace vfh_local_planner
         // check if plugin initialized
         if(!initialized_)
 		{
+            ROS_INFO("Initializing VFH Planner");
 
+            costmap_ros_ = costmap_ros;
+            tf_ = tf;
+
+            costmap_ = costmap_ros_->getCostmap();
+            initialized_ = true;
+
+            ROS_INFO("teste %d",(int)costmap_->getCost(30,30));
+
+            tes.Initialize(costmap_);
+
+                    
         }
         else
         {
@@ -40,6 +52,19 @@ namespace vfh_local_planner
 		ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
 		return false;
 		}
+
+        //ROS_INFO("Got new plan!");
+        
+        
+        while (true)
+        {
+            sleep(1);
+            tes.UpdateHistogram(costmap_ros_->getCostmap());
+        }
+        
+        goal_reached_ = false;
+
+        return true;
     };
 
     bool VFHPlannerRos::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
@@ -50,6 +75,33 @@ namespace vfh_local_planner
 		ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
 		return false;
 		}
+
+        /*
+        int height = costmap_ros_->getCostmap()->getSizeInCellsY();
+        int width = costmap_ros_->getCostmap()->getSizeInCellsX();
+
+        for (int i=0; i < height; i++)
+        {
+            for (int j=0; j < width; j++)
+            {
+                std::cout << (int)costmap_ros_->getCostmap()->getCost(height-i,width-j) << " ";
+            }
+             std::cout << std::endl;
+        }
+        std::cout << std::endl << std::endl << std::endl;
+        */
+
+        //tes.UpdateHistogram(costmap_ros_->getCostmap());
+
+        cmd_vel.linear.x = 0;
+        cmd_vel.linear.y = 0;
+        cmd_vel.linear.z = 0;
+
+        cmd_vel.angular.x = 0;
+        cmd_vel.angular.y = 0;
+        cmd_vel.angular.z = 0;
+
+        return true;
     };
 
     bool VFHPlannerRos::isGoalReached()
@@ -60,5 +112,6 @@ namespace vfh_local_planner
 		ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
 		return false;
 		}
+        return goal_reached_;
     };
 }

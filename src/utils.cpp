@@ -1,6 +1,27 @@
-#include "utils.h"
+#include "vfh_local_planner/utils.h"
 
-double getCoodinateAngle(int x, int y)
+double degToRad(double deg)
+{
+    double rad = deg * M_PI / 180.0;
+    if (rad < 0)
+        rad += 2*M_PI;
+    return rad;
+};
+
+double radToDeg(double rad)
+{
+    double deg = rad * 180.0 / M_PI;
+    if (deg < 0)
+        deg += 360;
+    return deg;
+};
+
+double getCoordinateAngle(int x, int y)
 {
     return atan2(y,x);
+};
+
+double getCoordinateDistance(int x, int y)
+{
+    return sqrt(pow(x,2) + pow(y,2));
 };
