@@ -3,8 +3,8 @@
 double degToRad(double deg)
 {
     double rad = deg * M_PI / 180.0;
-    if (rad < 0)
-        rad += 2*M_PI;
+    if (rad > M_PI)
+        rad -= 2*M_PI;
     return rad;
 };
 

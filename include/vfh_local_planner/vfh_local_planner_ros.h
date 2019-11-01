@@ -16,6 +16,10 @@
 // costmap & geometry
 #include <costmap_2d/costmap_2d_ros.h>
 
+#include <base_local_planner/local_planner_util.h>
+#include <base_local_planner/goal_functions.h>
+#include <base_local_planner/latched_stop_rotate_controller.h>
+
 // msgs
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -49,17 +53,34 @@ namespace vfh_local_planner
 
         bool isGoalReached();
 
+        //int CheckMaxDistance(tf::Stamped<tf::Pose> current_pose, tf::Stamped<tf::Pose> goal_pose);
+
     private:
+
+        int GetPlanPoint(std::vector<geometry_msgs::PoseStamped> transformed_plan, std::vector<geometry_msgs::PoseStamped> &global_plan, tf::Stamped<tf::Pose> current_pose);
 
         // pointer to external objects (do NOT delete object)
         costmap_2d::Costmap2DROS* costmap_ros_; ///<@brief pointer to costmap
         costmap_2d::Costmap2D* costmap_;
         tf::TransformListener* tf_; ///<@brief pointer to Transform Listener
+        std::vector<geometry_msgs::PoseStamped> global_plan_;
+        base_local_planner::OdometryHelperRos odom_helper_;
+        base_local_planner::LatchedStopRotateController trajectory_helper_;
 
-        VFHPlanner tes;
+        std::string global_frame_;
+
+        VFHPlanner vfh_planner;
+
+        int vfh_sections_number;
+        int smooth_length;
+        double vfh_threshold;
+        double yaw_goal_tolerance_, xy_goal_tolerance_;
         
 
         // flags
+        bool rotating_to_goal_;
+        bool xy_goal_latch_;
+        bool finding_alternative_way_;
         bool initialized_;
         bool goal_reached_;
     };
