@@ -26,6 +26,8 @@ namespace vfh_local_planner
         vfh_threshold = 150;
         wide_valley_threshold = 6;
         very_narrow_valley_threshold = 2;
+        vhf_detection_range = 15;
+        increase_rate = 1;
 
         max_vel_x_ = 0.4;
         acc_lim_x_ = 0.2;
@@ -74,9 +76,8 @@ namespace vfh_local_planner
         {
             for (int x=0; x < window_width; x++)
             {
-                //std::cout << (int)costmap->getCost(x, window_height-y-1) << " ";
                 double cell_sector = rint(costmap_cells_angle[x][y]/(360/vfh_sections_number));
-                double distance_cost = pow(0.5, ((costmap_cells_distance[x][y]/3)-10)); //(a - (b*costmap_cells_distance[x][y]));
+                double distance_cost = 100/(1+exp((increase_rate*costmap_cells_distance[x][y])-(increase_rate*vhf_detection_range)));
                 double magnitude = pow(((costmap->getCost(x, window_height-y-1))/254),2);
                 vfh_histogram[cell_sector] += magnitude*distance_cost;
             }
@@ -88,7 +89,7 @@ namespace vfh_local_planner
 
         for (int i=0; i < vfh_sections_number; i++)
         {
-            std::cout << smoothed_vfh_histogram[i] << " ";
+            std::cout << vfh_histogram[i] << " ";
         }
         printf("\nCandidates\n");
         for (int i=0; i < candidate_valleys.size(); i++)
@@ -122,7 +123,7 @@ namespace vfh_local_planner
                 
                 smoothed += (smooth_length-k)*vfh_histogram[lower_it] + (smooth_length-k)*vfh_histogram[upper_it];
             }
-            smoothed_vfh_histogram[i] = smoothed/(2*smooth_length+1);
+            vfh_histogram[i] = smoothed/(2*smooth_length+1);
         }
     }
 
@@ -134,7 +135,7 @@ namespace vfh_local_planner
         std::vector<int> valley;
         for (int i=0; i < vfh_sections_number; i++)
         {
-            if (smoothed_vfh_histogram[i] < vfh_threshold)
+            if (vfh_histogram[i] < vfh_threshold)
             {
                 valley.push_back(i);
             }

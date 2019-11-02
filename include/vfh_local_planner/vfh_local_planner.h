@@ -35,7 +35,7 @@ namespace vfh_local_planner
     int window_width;
     int window_height;
     int vfh_sections_number;
-    int a, b;
+    double vhf_detection_range, increase_rate;
     int goal_weight, curr_direction_weight, prev_direction_weight;
     int smooth_length;
     double vfh_threshold;
