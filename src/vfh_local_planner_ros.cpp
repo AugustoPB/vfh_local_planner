@@ -107,11 +107,11 @@ namespace vfh_local_planner
 
         //Transform plan goal from the global planner frame to the frame of the costmap
         const geometry_msgs::PoseStamped& plan_goal = global_plan_.back();
-        tf::Stamped<tf::Pose> transformed_plan_goal;
-        tf::poseStampedMsgToTF(plan_goal, transformed_plan_goal);
-        transformed_plan_goal.setData(frame_transform * transformed_plan_goal);
-        transformed_plan_goal.stamp_ = frame_transform.stamp_;
-        transformed_plan_goal.frame_id_ = global_frame_;
+        tf::Stamped<tf::Pose> global_goal;
+        tf::poseStampedMsgToTF(plan_goal, global_goal);
+        global_goal.setData(frame_transform * global_goal);
+        global_goal.stamp_ = frame_transform.stamp_;
+        global_goal.frame_id_ = global_frame_;
         //geometry_msgs::PoseStamped newer_pose;
         //poseStampedTFToMsg(tf_pose, newer_pose);
         
@@ -138,7 +138,7 @@ namespace vfh_local_planner
         //std::cout << "point index" << point_index << std::endl;
         tf::poseStampedMsgToTF(transformed_plan.at(point_index), intermediary_goal_point);
 
-        //std::cout << "Goal " << global_plan_.back().pose.position.x << " " << global_plan_.back().pose.position.y << " TGoal" << transformed_plan_goal.getOrigin().getX() << " " << transformed_plan_goal.getOrigin().getY() << " LGoal " << intermediary_goal_point.getOrigin().getX() << " " << intermediary_goal_point.getOrigin().getY() << std::endl;
+        //std::cout << "Goal " << global_plan_.back().pose.position.x << " " << global_plan_.back().pose.position.y << " TGoal" << global_goal.getOrigin().getX() << " " << global_goal.getOrigin().getY() << " LGoal " << intermediary_goal_point.getOrigin().getX() << " " << intermediary_goal_point.getOrigin().getY() << std::endl;
 
         //Update VFH histogram with new costmap
         vfh_planner.UpdateHistogram(costmap_ros_->getCostmap());
@@ -147,14 +147,14 @@ namespace vfh_local_planner
         //########################################### Check if the robot reached the goal position ####################################################
 
         //Check if the robot is at the goal coordinate x y
-        double goal_x = transformed_plan_goal.getOrigin().getX();
-        double goal_y = transformed_plan_goal.getOrigin().getY();
+        double goal_x = global_goal.getOrigin().getX();
+        double goal_y = global_goal.getOrigin().getY();
         if (base_local_planner::getGoalPositionDistance(current_pose, goal_x, goal_y) <= xy_goal_tolerance_ || xy_goal_latch_)
         {
             std::cout << "xy reached" << std::endl;
             xy_goal_latch_ = true;
             //Check if the robot is at the same orientation of the goal
-            double goal_th = tf::getYaw(transformed_plan_goal.getRotation());
+            double goal_th = tf::getYaw(global_goal.getRotation());
             if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, goal_th)) <= yaw_goal_tolerance_)
             {
                 std::cout << "parou yupi" << std::endl;
@@ -176,15 +176,16 @@ namespace vfh_local_planner
         double goal_distance;
         if(finding_alternative_way_)
         {
-            double global_plan_goal_angle = atan2((transformed_plan_goal.getOrigin().getY()-current_pose.getOrigin().getY()), (transformed_plan_goal.getOrigin().getX()-current_pose.getOrigin().getX()));
+            double global_plan_goal_angle = atan2((global_goal.getOrigin().getY()-current_pose.getOrigin().getY()), (global_goal.getOrigin().getX()-current_pose.getOrigin().getX()));
             goal_distance = 0.2;
             if (vfh_planner.DirectionIsClear(global_plan_goal_angle))
             {
                 direction_to_follow = global_plan_goal_angle;
+                goal_distance = sqrt(pow((global_goal.getOrigin().getX()-current_pose.getOrigin().getX()),2)+pow((global_goal.getOrigin().getY()-current_pose.getOrigin().getY()),2));
             }
             else
             {
-                direction_to_follow = vfh_planner.GetNewDirection(global_plan_goal_angle);
+                direction_to_follow = vfh_planner.GetNewDirection(global_plan_goal_angle, tf::getYaw(current_pose.getRotation()),previews_direction);
             }
         }
         else
@@ -206,6 +207,8 @@ namespace vfh_local_planner
                 goal_distance = sqrt(pow((intermediary_goal_point.getOrigin().getX()-current_pose.getOrigin().getX()),2)+pow((intermediary_goal_point.getOrigin().getY()-current_pose.getOrigin().getY()),2));
             }
         }
+
+        previews_direction = direction_to_follow;
 
         std::cout << "Going to direction: " << radToDeg(direction_to_follow) << std::endl;
         if (rotating_to_goal_)

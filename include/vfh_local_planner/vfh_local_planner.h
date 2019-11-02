@@ -28,7 +28,7 @@ namespace vfh_local_planner
         bool RotateToGoal(const tf::Stamped<tf::Pose>& global_pose, const tf::Stamped<tf::Pose>& robot_vel, double goal_th, geometry_msgs::Twist& cmd_vel);
         int DriveToward(double angle_to_goal, double goal_distance, geometry_msgs::Twist& cmd_vel);
         bool DirectionIsClear(double goal_direction);
-        double GetNewDirection(double global_plan_goal_direction);
+        double GetNewDirection(double global_plan_goal_direction, double current_robot_direction, double previews_direction);
 
     private:
 
@@ -36,6 +36,7 @@ namespace vfh_local_planner
     int window_height;
     int vfh_sections_number;
     int a, b;
+    int goal_weight, curr_direction_weight, prev_direction_weight;
     int smooth_length;
     double vfh_threshold;
     int wide_valley_threshold;

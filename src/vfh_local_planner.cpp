@@ -12,17 +12,19 @@ namespace vfh_local_planner
 
     }
 
+    //Initializes the planner and set parameters
     bool VFHPlanner::Initialize(costmap_2d::Costmap2D* costmap)
     {
         window_width = costmap->getSizeInCellsX();
         window_height = costmap->getSizeInCellsY();
 
         vfh_sections_number = 36;
-        b = 10;
-        a = 56.568542*b;
+        goal_weight = 1;
+        curr_direction_weight = 1;
+        prev_direction_weight = 2;
         smooth_length = 5;
-        vfh_threshold = 160;
-        wide_valley_threshold = 4;
+        vfh_threshold = 150;
+        wide_valley_threshold = 6;
         very_narrow_valley_threshold = 2;
 
         max_vel_x_ = 0.4;
@@ -43,19 +45,9 @@ namespace vfh_local_planner
         Alocate();
         UpdateHistogram(costmap);
 
-        /*
-        for (int i=0; i < window_height; i++)
-        {
-            for (int j=0; j < window_width; j++)
-            {
-                printf(" %lf ", costmap_cells_distance[i][j]);
-                //ROS_INFO("dist: %lf", costmap_cells_distance[i][j]);
-            }
-            printf(" ");
-        }
-        */
     }
 
+    //Populates and allocates vectors and matrices used in the planner
     void VFHPlanner::Alocate()
     {
         vfh_histogram.resize(vfh_sections_number, 0);
@@ -69,13 +61,11 @@ namespace vfh_local_planner
             {
                 costmap_cells_angle[x][y] = radToDeg(getCoordinateAngle(x-(window_width/2), (window_height/2)-y));
                 costmap_cells_distance[x][y] = getCoordinateDistance(x-(window_width/2), (window_height/2)-y);
-                //std::cout << costmap_cells_distance[x][y] << " ";
             }
-            //std::cout << std::endl;
         }
-        //printf("\n\n");
     }
 
+    //Updates the Hitogram based on the costmap
     void VFHPlanner::UpdateHistogram(costmap_2d::Costmap2D* costmap)
     {
         fill(vfh_histogram.begin(), vfh_histogram.end(),0);
@@ -90,21 +80,12 @@ namespace vfh_local_planner
                 double magnitude = pow(((costmap->getCost(x, window_height-y-1))/254),2);
                 vfh_histogram[cell_sector] += magnitude*distance_cost;
             }
-            //std::cout << std::endl;
         }
-        //std::cout << std::endl << std::endl;
         
         SmoothHistogram();
 
         GetCandidateValleys();
 
-        /*
-        for (int i=0; i < vfh_sections_number; i++)
-        {
-            std::cout << vfh_histogram[i] << " ";
-        }
-        printf("\n");
-        */
         for (int i=0; i < vfh_sections_number; i++)
         {
             std::cout << smoothed_vfh_histogram[i] << " ";
@@ -127,6 +108,7 @@ namespace vfh_local_planner
 
     }
 
+    //Filters and smooths the histogram
     void VFHPlanner::SmoothHistogram()
     {
         double smoothed;
@@ -144,6 +126,7 @@ namespace vfh_local_planner
         }
     }
 
+    //Get all valleys that the robot can pass
     void VFHPlanner::GetCandidateValleys()
     {
         candidate_valleys.clear();
@@ -176,13 +159,14 @@ namespace vfh_local_planner
         }
         for (int i=0; i<candidate_valleys.size(); i++)
         {
-            if (candidate_valleys.at(i).size() < very_narrow_valley_threshold)
+            if (candidate_valleys.at(i).size() <= very_narrow_valley_threshold)
             {
                 candidate_valleys.erase(candidate_valleys.begin()+i);
             }
         }
     }
 
+    //Checks if the given direction is clean
     bool VFHPlanner::DirectionIsClear(double goal_direction)
     {
         int intermediary_goal_sector = rint(radToDeg(goal_direction)/(360/vfh_sections_number));
@@ -198,55 +182,60 @@ namespace vfh_local_planner
         return true;
     }
 
-    double VFHPlanner::GetNewDirection(double global_plan_goal_direction)
+    //Gets new direction to avoid obstacle based on the goal direction
+    double VFHPlanner::GetNewDirection(double global_plan_goal_direction, double current_robot_direction, double previews_direction)
     {
-        int global_goal_sector = rint(radToDeg(global_plan_goal_direction)/(360/vfh_sections_number));
-        int closest_valley;
+
+        double goal_diff;
+        double curr_direction_diff;
+        double prev_direction_diff;
+        double direction_cost;
+        double smallest_cost = (M_PI*goal_weight) + (M_PI*curr_direction_weight) + (M_PI*prev_direction_weight);
+        int best_valley;
         bool valley_front;
-        int closest_sector_value = vfh_sections_number;
-        int sectors_diff;
-        double deviation_angle;
 
         for (int i=0; i < candidate_valleys.size(); i++)
         {
             std::cout << "valley : " << i << std::endl;
-            sectors_diff = candidate_valleys.at(i).front()-global_goal_sector;
-            if (sectors_diff < 0)
-                sectors_diff += vfh_sections_number;
-            std::cout << "sec dif: " << sectors_diff << std::endl;
-            if (sectors_diff < closest_sector_value)
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),previews_direction));
+            direction_cost = (goal_diff*goal_weight) + (curr_direction_diff*curr_direction_weight) + (prev_direction_diff*prev_direction_weight);
+            std::cout << "sec dif: " << direction_cost << std::endl;
+            if (direction_cost < smallest_cost)
             {
-                closest_sector_value = sectors_diff;
-                closest_valley = i;
+                smallest_cost = direction_cost;
+                best_valley = i;
                 valley_front = true;
             }
-            sectors_diff = global_goal_sector-candidate_valleys.at(i).back();
-            if (sectors_diff < 0)
-                sectors_diff += vfh_sections_number;
-            std::cout << "sec dif: " << sectors_diff << std::endl;
-            if (sectors_diff < closest_sector_value)
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),global_plan_goal_direction));
+            direction_cost = (goal_diff*goal_weight) + (curr_direction_diff*curr_direction_weight) + (prev_direction_diff*prev_direction_weight);
+            std::cout << "sec dif: " << direction_cost << std::endl;
+            if (direction_cost < smallest_cost)
             {
-                closest_sector_value = sectors_diff;
-                closest_valley = i;
+                smallest_cost = direction_cost;
+                best_valley = i;
                 valley_front = false;
             }
         }
-        //std::cout << "closest valley: " << closest_valley << " closest sector value: " << closest_sector_value << " valley front: " << valley_front << std::endl;
         
-        int valley_length = candidate_valleys.at(closest_valley).size();
+        int valley_length = candidate_valleys.at(best_valley).size();
+        double deviation_angle;
         if (valley_length < wide_valley_threshold)
         {
-            deviation_angle = candidate_valleys.at(closest_valley).at(floor(valley_length/2))*10;
+            deviation_angle = candidate_valleys.at(best_valley).at(floor(valley_length/2))*10;
         }
         else
         {
             if (valley_front)
             {
-                deviation_angle = candidate_valleys.at(closest_valley).at(floor(wide_valley_threshold/2))*10;
+                deviation_angle = candidate_valleys.at(best_valley).at(floor(wide_valley_threshold/2))*10;
             }
             else
             {
-                deviation_angle = candidate_valleys.at(closest_valley).at(valley_length-1-floor(wide_valley_threshold/2))*10;
+                deviation_angle = candidate_valleys.at(best_valley).at(valley_length-1-floor(wide_valley_threshold/2))*10;
             }
         }
         std::cout << "deviation deg: " << deviation_angle << std::endl;
@@ -255,6 +244,7 @@ namespace vfh_local_planner
         return deviation_angle;
     }
 
+    //Get speeds to rotate the robot to the angle
     bool VFHPlanner::RotateToGoal(const tf::Stamped<tf::Pose>& global_pose, const tf::Stamped<tf::Pose>& robot_vel, double goal_th, geometry_msgs::Twist& cmd_vel)
     {
         if (cmd_vel.linear.x - 0.1 >= 0)
@@ -286,16 +276,11 @@ namespace vfh_local_planner
 
         cmd_vel.angular.z = v_theta_samp;
         return true;
-        
-
     }
 
+    //Get speeds to drive the robot towards the goal
     int VFHPlanner::DriveToward(double angle_to_goal, double goal_distance, geometry_msgs::Twist& cmd_vel)
     {
-
-        //double distance = sqrt(pow((goal_pose.getOrigin().getX()-current_pose.getOrigin().getX()),2)+pow((goal_pose.getOrigin().getY()-current_pose.getOrigin().getY()),2));
-
-        //double ang_diff = angles::shortest_angular_distance(tf::getYaw(current_pose.getRotation()),angle);
 
         double x_speed = std::min(goal_distance, cmd_vel_linear_x_ + acc_lim_x_/local_planner_frequence);
 
@@ -304,23 +289,6 @@ namespace vfh_local_planner
         double th_speed = (angle_to_goal < 0)? std::max(angle_to_goal, cmd_vel_angular_z_ - acc_lim_theta_/local_planner_frequence) : std::min(angle_to_goal, cmd_vel_angular_z_ + acc_lim_theta_/local_planner_frequence);
 
         th_speed = (th_speed > 0)? std::min(th_speed, max_vel_th_): std::max(th_speed, min_vel_th_);
-
-        //double time_to_reach_th = angle_to_goal/th_speed;
-
-        //if (time_to_reach_xy < time_to_reach_th)
-        //{
-        //    x_speed = goal_distance/time_to_reach_th;
-        //}
-        //else
-        //{
-        //    th_speed = angle_to_goal/time_to_reach_xy;
-        //}
-
-        //x_speed = (std::min(x_speed, cmd_vel.linear.x + acc_lim_x_/local_planner_frequence));
-
-        
-        
-        //std::cout << "x vel: " << x_speed << " th vel: " << th_speed << std::endl;
 
         cmd_vel_linear_x_ = x_speed;
         cmd_vel_angular_z_ = th_speed;

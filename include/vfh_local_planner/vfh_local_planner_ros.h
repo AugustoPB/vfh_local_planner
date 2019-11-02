@@ -75,6 +75,7 @@ namespace vfh_local_planner
         int smooth_length;
         double vfh_threshold;
         double yaw_goal_tolerance_, xy_goal_tolerance_;
+        double previews_direction;
         
 
         // flags
