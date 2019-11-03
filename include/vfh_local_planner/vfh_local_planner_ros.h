@@ -28,6 +28,10 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 
+// config and parameters
+#include <dynamic_reconfigure/server.h>
+#include "vfh_local_planner/vfh_local_plannerConfig.h"
+
 #include "vfh_local_planner/vfh_local_planner.h"
 
 
@@ -53,11 +57,11 @@ namespace vfh_local_planner
 
         bool isGoalReached();
 
-        //int CheckMaxDistance(tf::Stamped<tf::Pose> current_pose, tf::Stamped<tf::Pose> goal_pose);
-
     private:
 
         int GetPlanPoint(std::vector<geometry_msgs::PoseStamped> transformed_plan, std::vector<geometry_msgs::PoseStamped> &global_plan, tf::Stamped<tf::Pose> current_pose);
+
+        void reconfigureCB(vfh_local_plannerConfig &config, uint32_t level);
 
         // pointer to external objects (do NOT delete object)
         costmap_2d::Costmap2DROS* costmap_ros_; ///<@brief pointer to costmap
@@ -65,8 +69,9 @@ namespace vfh_local_planner
         tf::TransformListener* tf_; ///<@brief pointer to Transform Listener
         std::vector<geometry_msgs::PoseStamped> global_plan_;
         base_local_planner::OdometryHelperRos odom_helper_;
-        base_local_planner::LatchedStopRotateController trajectory_helper_;
-
+        dynamic_reconfigure::Server<vfh_local_plannerConfig> *dsrv_;
+        vfh_local_planner::vfh_local_plannerConfig default_config_;
+        vfh_local_planner::vfh_local_plannerConfig config_;
         std::string global_frame_;
 
         VFHPlanner vfh_planner;

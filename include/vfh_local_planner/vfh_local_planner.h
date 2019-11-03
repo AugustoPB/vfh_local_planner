@@ -10,6 +10,7 @@
 
 #include <ros/ros.h>
 #include "vfh_local_planner/utils.h"
+#include "vfh_local_planner/vfh_local_plannerConfig.h"
 
 namespace vfh_local_planner
 {
@@ -19,6 +20,7 @@ namespace vfh_local_planner
         VFHPlanner();
         ~VFHPlanner();
 
+        void Reconfigure(vfh_local_plannerConfig &cfg);
         bool Initialize(costmap_2d::Costmap2D* costmap);
         void Alocate();
         void UpdateHistogram(costmap_2d::Costmap2D* costmap);
@@ -34,6 +36,7 @@ namespace vfh_local_planner
 
     int window_width;
     int window_height;
+
     int vfh_sections_number;
     double vhf_detection_range, increase_rate;
     int goal_weight, curr_direction_weight, prev_direction_weight;
@@ -41,15 +44,11 @@ namespace vfh_local_planner
     double vfh_threshold;
     int wide_valley_threshold;
     int very_narrow_valley_threshold;
-
-    double max_vel_x_, min_vel_x_, max_vel_th_, min_vel_th_, min_in_place_vel_th_;
-    double acc_lim_x_, acc_lim_y_, acc_lim_theta_;
-    double xy_goal_tolerance_, yaw_goal_tolerance_;
-
+    double max_vel_x_, max_vel_th_, min_vel_th_, min_in_place_vel_th_;
+    double acc_lim_x_, acc_lim_theta_;
     double local_planner_frequence;
-    double slow_down_factor;
+
     double cmd_vel_linear_x_;
-    double cmd_vel_angular_z_rotate_;
     double cmd_vel_angular_z_;
 
 
@@ -57,9 +56,9 @@ namespace vfh_local_planner
     std::vector<std::vector<double> > costmap_cells_angle;
     std::vector<std::vector<double> > costmap_cells_distance;
     std::vector<double> vfh_histogram;
-    std::vector<double> smoothed_vfh_histogram;
     std::vector<std::vector<int> > candidate_valleys;
     std::vector<int> rejected_peaks;
+    vfh_local_planner::vfh_local_plannerConfig config_;
 
     };
 }

@@ -1,0 +1,55 @@
+!!python/object/new:dynamic_reconfigure.encoding.Config
+dictitems:
+  acc_lim_theta_: 0.3
+  acc_lim_x_: 0.2
+  curr_direction_weight: 1
+  goal_weight: 1
+  groups: !!python/object/new:dynamic_reconfigure.encoding.Config
+    dictitems:
+      acc_lim_theta_: 0.3
+      acc_lim_x_: 0.2
+      curr_direction_weight: 1
+      goal_weight: 1
+      groups: !!python/object/new:dynamic_reconfigure.encoding.Config
+        state: []
+      id: 0
+      increase_rate: 1.0
+      local_planner_frequence: 5.0
+      max_vel_th_: 0.55
+      max_vel_x_: 0.4
+      min_in_place_vel_th_: 0.4
+      min_vel_th_: -0.55
+      name: Default
+      parameters: !!python/object/new:dynamic_reconfigure.encoding.Config
+        state: []
+      parent: 0
+      prev_direction_weight: 2
+      restore_defaults: false
+      smooth_length: 4
+      state: true
+      type: ''
+      very_narrow_valley_threshold: 1
+      vfh_sections_number: 36
+      vfh_threshold: 260.0
+      vhf_detection_range: 20.0
+      wide_valley_threshold: 6
+      xy_goal_tolerance_: 0.1
+      yaw_goal_tolerance_: 0.1
+    state: []
+  increase_rate: 1.0
+  local_planner_frequence: 5.0
+  max_vel_th_: 0.55
+  max_vel_x_: 0.4
+  min_in_place_vel_th_: 0.4
+  min_vel_th_: -0.55
+  prev_direction_weight: 2
+  restore_defaults: false
+  smooth_length: 4
+  very_narrow_valley_threshold: 1
+  vfh_sections_number: 36
+  vfh_threshold: 260.0
+  vhf_detection_range: 20.0
+  wide_valley_threshold: 6
+  xy_goal_tolerance_: 0.1
+  yaw_goal_tolerance_: 0.1
+state: []

@@ -25,6 +25,13 @@ namespace vfh_local_planner
 		{
             ROS_INFO("Initializing VFH Planner");
 
+            ros::NodeHandle private_nh("~/" + name);
+
+            //Parameter for dynamic reconfigure
+            dsrv_ = new dynamic_reconfigure::Server<vfh_local_plannerConfig>(private_nh);
+            dynamic_reconfigure::Server<vfh_local_plannerConfig>::CallbackType cb = boost::bind(&VFHPlannerRos::reconfigureCB, this, _1, _2);
+            dsrv_->setCallback(cb);
+
             xy_goal_tolerance_ = 0.10;
             yaw_goal_tolerance_ = 0.05;
             xy_goal_latch_ = false;
@@ -49,7 +56,19 @@ namespace vfh_local_planner
             ROS_WARN("This planner has already been initialized, doing nothing.");
         }
         
-    };
+    }
+
+    void VFHPlannerRos::reconfigureCB(vfh_local_plannerConfig &config, uint32_t level)
+    {
+        if (config.restore_defaults)
+        {
+            config = default_config_;
+            config.restore_defaults = false;
+        }
+        config_ = config;
+        vfh_planner.Reconfigure(config);
+        goal_reached_ = false;
+    }
 
     bool VFHPlannerRos::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
     {
@@ -149,13 +168,13 @@ namespace vfh_local_planner
         //Check if the robot is at the goal coordinate x y
         double goal_x = global_goal.getOrigin().getX();
         double goal_y = global_goal.getOrigin().getY();
-        if (base_local_planner::getGoalPositionDistance(current_pose, goal_x, goal_y) <= xy_goal_tolerance_ || xy_goal_latch_)
+        if (base_local_planner::getGoalPositionDistance(current_pose, goal_x, goal_y) <= config_.xy_goal_tolerance_ || xy_goal_latch_)
         {
             std::cout << "xy reached" << std::endl;
             xy_goal_latch_ = true;
             //Check if the robot is at the same orientation of the goal
             double goal_th = tf::getYaw(global_goal.getRotation());
-            if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, goal_th)) <= yaw_goal_tolerance_)
+            if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, goal_th)) <= config_.yaw_goal_tolerance_)
             {
                 std::cout << "parou yupi" << std::endl;
                 cmd_vel.linear.x = 0.0;
@@ -215,7 +234,7 @@ namespace vfh_local_planner
         {
             std::cout << "rotating to goal to start" << std::endl;
             vfh_planner.RotateToGoal(current_pose, current_vel, direction_to_follow, cmd_vel);
-            if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, direction_to_follow)) < yaw_goal_tolerance_)
+            if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, direction_to_follow)) < config_.yaw_goal_tolerance_)
             {
                 rotating_to_goal_ = false;
             }
