@@ -23,7 +23,7 @@ namespace vfh_local_planner
         void Reconfigure(vfh_local_plannerConfig &cfg);
         bool Initialize(costmap_2d::Costmap2D* costmap);
         void Alocate();
-        void UpdateHistogram(costmap_2d::Costmap2D* costmap);
+        bool UpdateHistogram(costmap_2d::Costmap2D* costmap);
         void SmoothHistogram();
         void GetCandidateValleys();
 

@@ -50,7 +50,7 @@ namespace vfh_local_planner
     }
 
     //Updates the Hitogram based on the costmap
-    void VFHPlanner::UpdateHistogram(costmap_2d::Costmap2D* costmap)
+    bool VFHPlanner::UpdateHistogram(costmap_2d::Costmap2D* costmap)
     {
         fill(vfh_histogram.begin(), vfh_histogram.end(),0);
 
@@ -68,6 +68,9 @@ namespace vfh_local_planner
         SmoothHistogram();
 
         GetCandidateValleys();
+
+        if (candidate_valleys.size() < 1)
+            return false;
 
         for (int i=0; i < config_.vfh_sections_number; i++)
         {
@@ -88,6 +91,8 @@ namespace vfh_local_planner
             std::cout << rejected_peaks.at(j) << " ";
         }
         std::cout << std::endl;
+
+        return true;
 
     }
 
@@ -179,23 +184,20 @@ namespace vfh_local_planner
 
         for (int i=0; i < candidate_valleys.size(); i++)
         {
-            std::cout << "valley : " << i << std::endl;
-            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),global_plan_goal_direction));
-            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),current_robot_direction));
-            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*10),previews_direction));
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),previews_direction));
             direction_cost = (goal_diff*config_.goal_weight) + (curr_direction_diff*config_.curr_direction_weight) + (prev_direction_diff*config_.prev_direction_weight);
-            std::cout << "sec dif: " << direction_cost << std::endl;
             if (direction_cost < smallest_cost)
             {
                 smallest_cost = direction_cost;
                 best_valley = i;
                 valley_front = true;
             }
-            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),global_plan_goal_direction));
-            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),current_robot_direction));
-            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*10),global_plan_goal_direction));
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
             direction_cost = (goal_diff*config_.goal_weight) + (curr_direction_diff*config_.curr_direction_weight) + (prev_direction_diff*config_.prev_direction_weight);
-            std::cout << "sec dif: " << direction_cost << std::endl;
             if (direction_cost < smallest_cost)
             {
                 smallest_cost = direction_cost;
@@ -208,23 +210,20 @@ namespace vfh_local_planner
         double deviation_angle;
         if (valley_length < config_.wide_valley_threshold)
         {
-            deviation_angle = candidate_valleys.at(best_valley).at(floor(valley_length/2))*10;
+            deviation_angle = candidate_valleys.at(best_valley).at(floor(valley_length/2))*(360/config_.vfh_sections_number);
         }
         else
         {
             if (valley_front)
             {
-                deviation_angle = candidate_valleys.at(best_valley).at(floor(config_.wide_valley_threshold/2))*10;
+                deviation_angle = candidate_valleys.at(best_valley).at(floor(config_.wide_valley_threshold/2))*(360/config_.vfh_sections_number);
             }
             else
             {
-                deviation_angle = candidate_valleys.at(best_valley).at(valley_length-1-floor(config_.wide_valley_threshold/2))*10;
+                deviation_angle = candidate_valleys.at(best_valley).at(valley_length-1-floor(config_.wide_valley_threshold/2))*(360/config_.vfh_sections_number);
             }
         }
-        std::cout << "deviation deg: " << deviation_angle << std::endl;
-        deviation_angle = degToRad(deviation_angle);
-        std::cout << "deviation rad: " << deviation_angle << std::endl;
-        return deviation_angle;
+        return degToRad(deviation_angle);
     }
 
     //Get speeds to rotate the robot to the angle

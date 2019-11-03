@@ -32,8 +32,6 @@ namespace vfh_local_planner
             dynamic_reconfigure::Server<vfh_local_plannerConfig>::CallbackType cb = boost::bind(&VFHPlannerRos::reconfigureCB, this, _1, _2);
             dsrv_->setCallback(cb);
 
-            xy_goal_tolerance_ = 0.10;
-            yaw_goal_tolerance_ = 0.05;
             xy_goal_latch_ = false;
             rotating_to_goal_ = false;
             finding_alternative_way_ = false;
@@ -45,11 +43,7 @@ namespace vfh_local_planner
             costmap_ = costmap_ros_->getCostmap();
             initialized_ = true;
 
-            ROS_INFO("teste %d",(int)costmap_->getCost(30,30));
-
-            vfh_planner.Initialize(costmap_);
-
-                    
+            vfh_planner.Initialize(costmap_);     
         }
         else
         {
@@ -86,14 +80,6 @@ namespace vfh_local_planner
         xy_goal_latch_ = false;
         rotating_to_goal_ = true;
         finding_alternative_way_ = false;
-
-        /*
-        while (true)
-        {
-            sleep(1);
-            vfh_planner.UpdateHistogram(costmap_ros_->getCostmap());
-        }
-        */
         goal_reached_ = false;
 
         return true;
@@ -131,8 +117,6 @@ namespace vfh_local_planner
         global_goal.setData(frame_transform * global_goal);
         global_goal.stamp_ = frame_transform.stamp_;
         global_goal.frame_id_ = global_frame_;
-        //geometry_msgs::PoseStamped newer_pose;
-        //poseStampedTFToMsg(tf_pose, newer_pose);
         
 
         //Transforms the global plan of the robot from the global planner frame to the frame of the costmap
@@ -143,7 +127,7 @@ namespace vfh_local_planner
         }
 
         //Trim off parts of the global plan that are far enough behind the robot
-        //base_local_planner::prunePlan(current_pose, transformed_plan, global_plan_);
+        base_local_planner::prunePlan(current_pose, transformed_plan, global_plan_);
 
         if(transformed_plan.empty())
         {
@@ -157,10 +141,12 @@ namespace vfh_local_planner
         //std::cout << "point index" << point_index << std::endl;
         tf::poseStampedMsgToTF(transformed_plan.at(point_index), intermediary_goal_point);
 
-        //std::cout << "Goal " << global_plan_.back().pose.position.x << " " << global_plan_.back().pose.position.y << " TGoal" << global_goal.getOrigin().getX() << " " << global_goal.getOrigin().getY() << " LGoal " << intermediary_goal_point.getOrigin().getX() << " " << intermediary_goal_point.getOrigin().getY() << std::endl;
-
         //Update VFH histogram with new costmap
-        vfh_planner.UpdateHistogram(costmap_ros_->getCostmap());
+        if (!vfh_planner.UpdateHistogram(costmap_ros_->getCostmap()))
+        {
+            ROS_WARN("Could not find clear direction");
+            return false;
+        }
 
         //#############################################################################################################################################
         //########################################### Check if the robot reached the goal position ####################################################
@@ -215,7 +201,7 @@ namespace vfh_local_planner
             if (!vfh_planner.DirectionIsClear(intermediary_goal_orientation))
             {
                 finding_alternative_way_ = true;
-                cmd_vel.linear.x = 0.0;
+                cmd_vel.linear.x = -1.0;
                 cmd_vel.linear.y = 0.0;
                 cmd_vel.angular.z = 0.0;
                 return true;
