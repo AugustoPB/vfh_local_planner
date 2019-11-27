@@ -52,22 +52,28 @@ namespace vfh_local_planner
     //Updates the Hitogram based on the costmap
     bool VFHPlanner::UpdateHistogram(costmap_2d::Costmap2D* costmap)
     {
+        std::cout << "cleanning" << std::endl;
         fill(vfh_histogram.begin(), vfh_histogram.end(),0);
 
         for (int y=0; y < window_height; y++)
         {
             for (int x=0; x < window_width; x++)
             {
-                double cell_sector = rint(costmap_cells_angle[x][y]/(360/config_.vfh_sections_number));
+                double cell_sector = rint(costmap_cells_angle[x][y]/(360/(config_.vfh_sections_number-1)));
                 double distance_cost = 100/(1+exp((config_.increase_rate*costmap_cells_distance[x][y])-(config_.increase_rate*config_.vhf_detection_range)));
                 double magnitude = pow(((costmap->getCost(x, window_height-y-1))/254),2);
                 vfh_histogram[cell_sector] += magnitude*distance_cost;
             }
         }
+        std::cout << "updated hist" << std::endl;
         
         SmoothHistogram();
 
+        std::cout << "smoothed" << std::endl;
+
         GetCandidateValleys();
+
+        std::cout << "candidates" << std::endl;
 
         if (candidate_valleys.size() < 1)
             return false;
@@ -99,6 +105,7 @@ namespace vfh_local_planner
     //Filters and smooths the histogram
     void VFHPlanner::SmoothHistogram()
     {
+        std::vector<double> smoothed_histogram(config_.vfh_sections_number);
         double smoothed;
         for (int i=0; i < config_.vfh_sections_number; i++)
         {
@@ -110,8 +117,9 @@ namespace vfh_local_planner
                 
                 smoothed += (config_.smooth_length-k)*vfh_histogram[lower_it] + (config_.smooth_length-k)*vfh_histogram[upper_it];
             }
-            vfh_histogram[i] = smoothed/(2*config_.smooth_length+1);
+            smoothed_histogram[i] = smoothed/(2*config_.smooth_length+1);
         }
+        vfh_histogram = smoothed_histogram;
     }
 
     //Get all valleys that the robot can pass
@@ -149,6 +157,7 @@ namespace vfh_local_planner
         {
             if (candidate_valleys.at(i).size() <= config_.very_narrow_valley_threshold)
             {
+                rejected_peaks.insert(rejected_peaks.end(),candidate_valleys.at(i).begin(), candidate_valleys.at(i).end());
                 candidate_valleys.erase(candidate_valleys.begin()+i);
             }
         }
@@ -157,16 +166,35 @@ namespace vfh_local_planner
     //Checks if the given direction is clean
     bool VFHPlanner::DirectionIsClear(double goal_direction)
     {
-        int intermediary_goal_sector = rint(radToDeg(goal_direction)/(360/config_.vfh_sections_number));
-        std::cout << "sector of goal: " << intermediary_goal_sector << std::endl;
+        int goal_sector = rint(radToDeg(goal_direction)/(360/(config_.vfh_sections_number-1)));
+        std::cout << "sector of goal: " << goal_sector << std::endl;
 
+        for (int k=0; k <= (config_.very_narrow_valley_threshold/2)-1; k++)
+            {
+                int upper_sector = (goal_sector+k > config_.vfh_sections_number-1)? goal_sector+k - config_.vfh_sections_number: goal_sector+k;
+                int lower_sector = (goal_sector-k < 0)? config_.vfh_sections_number - goal_sector-k: goal_sector-k;
+                std::cout << "vsec " << upper_sector << "  " << lower_sector << std::endl;
+                if (vfh_histogram.at(upper_sector) > config_.vfh_threshold || vfh_histogram.at(lower_sector) > config_.vfh_threshold)
+                    return false;
+            }
+        /*
+        bool side_obstructed = false;
         for (int i=0; i < rejected_peaks.size(); i++)
         {
-            if (intermediary_goal_sector == rejected_peaks.at(i))
+            for (int k=1; k <= (int)(config_.very_narrow_valley_threshold/2)-1; k++)
+            {
+                int upper_sector = (goal_sector+k < config_.vfh_sections_number-1)? goal_sector+k - config_.vfh_sections_number: goal_sector+k;
+                int lower_sector = (goal_sector-k < 0)? config_.vfh_sections_number - goal_sector-k: goal_sector-k;
+                if ((upper_sector == rejected_peaks.at(i)) || (lower_sector == rejected_peaks.at(i)))
+                    return false;
+            }
+
+            if (goal_sector == rejected_peaks.at(i))
             {
                 return false;
             }
         }
+        */
         return true;
     }
 
@@ -184,9 +212,9 @@ namespace vfh_local_planner
 
         for (int i=0; i < candidate_valleys.size(); i++)
         {
-            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
-            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),current_robot_direction));
-            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/config_.vfh_sections_number)),previews_direction));
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/(config_.vfh_sections_number-1))),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/(config_.vfh_sections_number-1))),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).front()*(360/(config_.vfh_sections_number-1))),previews_direction));
             direction_cost = (goal_diff*config_.goal_weight) + (curr_direction_diff*config_.curr_direction_weight) + (prev_direction_diff*config_.prev_direction_weight);
             if (direction_cost < smallest_cost)
             {
@@ -194,9 +222,9 @@ namespace vfh_local_planner
                 best_valley = i;
                 valley_front = true;
             }
-            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
-            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),current_robot_direction));
-            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/config_.vfh_sections_number)),global_plan_goal_direction));
+            goal_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/(config_.vfh_sections_number-1))),global_plan_goal_direction));
+            curr_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/(config_.vfh_sections_number-1))),current_robot_direction));
+            prev_direction_diff = fabs(angles::shortest_angular_distance(degToRad(candidate_valleys.at(i).back()*(360/(config_.vfh_sections_number-1))),global_plan_goal_direction));
             direction_cost = (goal_diff*config_.goal_weight) + (curr_direction_diff*config_.curr_direction_weight) + (prev_direction_diff*config_.prev_direction_weight);
             if (direction_cost < smallest_cost)
             {
@@ -210,17 +238,17 @@ namespace vfh_local_planner
         double deviation_angle;
         if (valley_length < config_.wide_valley_threshold)
         {
-            deviation_angle = candidate_valleys.at(best_valley).at(floor(valley_length/2))*(360/config_.vfh_sections_number);
+            deviation_angle = candidate_valleys.at(best_valley).at(floor(valley_length/2))*(360/(config_.vfh_sections_number-1));
         }
         else
         {
             if (valley_front)
             {
-                deviation_angle = candidate_valleys.at(best_valley).at(floor(config_.wide_valley_threshold/2))*(360/config_.vfh_sections_number);
+                deviation_angle = candidate_valleys.at(best_valley).at(floor(config_.wide_valley_threshold/2))*(360/(config_.vfh_sections_number-1));
             }
             else
             {
-                deviation_angle = candidate_valleys.at(best_valley).at(valley_length-1-floor(config_.wide_valley_threshold/2))*(360/config_.vfh_sections_number);
+                deviation_angle = candidate_valleys.at(best_valley).at(valley_length-1-floor(config_.wide_valley_threshold/2))*(360/(config_.vfh_sections_number-1));
             }
         }
         return degToRad(deviation_angle);
@@ -229,8 +257,7 @@ namespace vfh_local_planner
     //Get speeds to rotate the robot to the angle
     bool VFHPlanner::RotateToGoal(const tf::Stamped<tf::Pose>& global_pose, const tf::Stamped<tf::Pose>& robot_vel, double goal_th, geometry_msgs::Twist& cmd_vel)
     {
-        if (cmd_vel.linear.x - 0.1 >= 0)
-            cmd_vel.linear.x -= 0.1;
+        cmd_vel.linear.x = 0.0;
 
         double yaw = tf::getYaw(global_pose.getRotation());
         double vel_yaw = tf::getYaw(robot_vel.getRotation());
@@ -255,15 +282,16 @@ namespace vfh_local_planner
         v_theta_samp = v_theta_samp > 0.0
           ? std::min( config_.max_vel_th_, std::max( config_.min_in_place_vel_th_, v_theta_samp ))
           : std::max( config_.min_vel_th_, std::min( -1.0 * config_.min_in_place_vel_th_, v_theta_samp ));
-
+        
+        cmd_vel_angular_z_ = v_theta_samp;
         cmd_vel.angular.z = v_theta_samp;
         return true;
     }
 
     //Get speeds to drive the robot towards the goal
-    int VFHPlanner::DriveToward(double angle_to_goal, double goal_distance, geometry_msgs::Twist& cmd_vel)
+    void VFHPlanner::DriveToward(double angle_to_goal, double goal_distance, geometry_msgs::Twist& cmd_vel)
     {
-
+        std::cout << "begin drive" << std::endl;
         double x_speed = std::min(goal_distance, cmd_vel_linear_x_ + config_.acc_lim_x_/config_.local_planner_frequence);
 
         x_speed = std::min(x_speed,config_.max_vel_x_);
@@ -276,7 +304,7 @@ namespace vfh_local_planner
         cmd_vel_angular_z_ = th_speed;
         cmd_vel.linear.x = x_speed;
         cmd_vel.angular.z = th_speed;
-        
+        std::cout << "x vel: " << cmd_vel.linear.x << " z vel: " << cmd_vel.angular.z << std::endl;
     }
 
 }

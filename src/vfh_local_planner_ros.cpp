@@ -79,9 +79,9 @@ namespace vfh_local_planner
         global_plan_ = orig_global_plan;
         xy_goal_latch_ = false;
         rotating_to_goal_ = true;
-        finding_alternative_way_ = false;
         goal_reached_ = false;
-
+        finding_alternative_way_ = false;
+            
         return true;
     };
 
@@ -118,29 +118,34 @@ namespace vfh_local_planner
         global_goal.stamp_ = frame_transform.stamp_;
         global_goal.frame_id_ = global_frame_;
         
-
         //Transforms the global plan of the robot from the global planner frame to the frame of the costmap
         std::vector<geometry_msgs::PoseStamped> transformed_plan;
         if (!base_local_planner::transformGlobalPlan(*tf_, global_plan_, current_pose, *costmap_, global_frame_, transformed_plan)) {
-          ROS_WARN("Could not transform the global plan to the frame of the controller");
-          return false;
+            
+            ROS_WARN("Could not transform the global plan to the frame of the controller");
+            if (!config_.ignore_global_plan_updates)
+                return false;
         }
 
-        //Trim off parts of the global plan that are far enough behind the robot
-        base_local_planner::prunePlan(current_pose, transformed_plan, global_plan_);
+        tf::Stamped<tf::Pose> intermediary_goal_point;
+        //Check if the modified plan is not empty
+        if (!transformed_plan.empty())
+        {
+            //Trim off parts of the global plan that are far enough behind the robot
+            //base_local_planner::prunePlan(current_pose, transformed_plan, global_plan_);
 
-        if(transformed_plan.empty())
+            //Get intermediary goal point in the transformed plan
+            int point_index = GetPlanPoint(transformed_plan, global_plan_,current_pose);
+            tf::poseStampedMsgToTF(transformed_plan.at(point_index), intermediary_goal_point);
+
+        }
+        else
         {
             ROS_ERROR("Plan is empty");
-            return false;
+            if (!config_.ignore_global_plan_updates)
+                return false;
         }
-
-        //Get intermediary goal point in the transformed plan
-        tf::Stamped<tf::Pose> intermediary_goal_point;
-        int point_index = GetPlanPoint(transformed_plan, global_plan_,current_pose);
-        //std::cout << "point index" << point_index << std::endl;
-        tf::poseStampedMsgToTF(transformed_plan.at(point_index), intermediary_goal_point);
-
+        
         //Update VFH histogram with new costmap
         if (!vfh_planner.UpdateHistogram(costmap_ros_->getCostmap()))
         {
@@ -186,7 +191,7 @@ namespace vfh_local_planner
             if (vfh_planner.DirectionIsClear(global_plan_goal_angle))
             {
                 direction_to_follow = global_plan_goal_angle;
-                goal_distance = sqrt(pow((global_goal.getOrigin().getX()-current_pose.getOrigin().getX()),2)+pow((global_goal.getOrigin().getY()-current_pose.getOrigin().getY()),2));
+                goal_distance = std::min(sqrt(pow((global_goal.getOrigin().getX()-current_pose.getOrigin().getX()),2)+pow((global_goal.getOrigin().getY()-current_pose.getOrigin().getY()),2)), 0.3);
             }
             else
             {
@@ -201,7 +206,7 @@ namespace vfh_local_planner
             if (!vfh_planner.DirectionIsClear(intermediary_goal_orientation))
             {
                 finding_alternative_way_ = true;
-                cmd_vel.linear.x = -1.0;
+                cmd_vel.linear.x = 0.0;
                 cmd_vel.linear.y = 0.0;
                 cmd_vel.angular.z = 0.0;
                 return true;
@@ -227,10 +232,13 @@ namespace vfh_local_planner
             return true;
         }
         //Check if the robot is deviating too much from the plan
-        else if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, direction_to_follow)) > M_PI/4)
+        else if (fabs(base_local_planner::getGoalOrientationAngleDifference(current_pose, direction_to_follow)) > M_PI/3)
         {
             std::cout << "rotating to goal to start" << std::endl;
             rotating_to_goal_ = true;
+            cmd_vel.linear.x = 0.05;
+            cmd_vel.linear.y = 0.0;
+            cmd_vel.angular.z = 0.0;
         }
         //Drive toward the plan
         else 
@@ -262,8 +270,6 @@ namespace vfh_local_planner
             if (point_distance < 0.6)
             {
                 point = i;
-                //global_plan.erase(global_plan.begin()+i);
-                //break;
             }
             else
             {
